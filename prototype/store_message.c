@@ -35,6 +35,7 @@ static ssize_t my_write(struct file *file, const char __user *user_buffer, size_
 {
     ssize_t bytes_written;
 
+    printk("You called the syscall write");
     if(count > BUF_LEN) {
         return -EINVAL;
     }
@@ -55,6 +56,7 @@ static ssize_t my_write(struct file *file, const char __user *user_buffer, size_
 static ssize_t my_read(struct file *file, char __user *user_buffer, size_t count, loff_t *ppos)
 {
     ssize_t bytes_read;
+    printk("You called the syscall read.");
 
     // Make sure our user isn't trying to read more data than there is.
     if(count > char_device.size) {
