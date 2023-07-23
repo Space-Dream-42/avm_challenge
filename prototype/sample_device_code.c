@@ -1,112 +1,144 @@
-#include <linux/fs.h>
-#include <linux/cdev.h>
 #include <linux/init.h>
-#include <linux/device.h>
 #include <linux/module.h>
+#include <linux/cdev.h>
+#include <linux/device.h>
 #include <linux/kernel.h>
 #include <linux/uaccess.h>
+#include <linux/fs.h>
 
-#define CDRV_MAJOR       42
-#define CDRV_MAX_MINORS  1
-#define BUF_LEN 256
-#define CDRV_DEVICE_NAME "cdrv_dev"
-#define CDRV_CLASS_NAME "cdrv_class"
+#define MAX_DEV 2
 
-struct cdrv_device_data {
+static int mychardev_open(struct inode *inode, struct file *file);
+static int mychardev_release(struct inode *inode, struct file *file);
+static long mychardev_ioctl(struct file *file, unsigned int cmd, unsigned long arg);
+static ssize_t mychardev_read(struct file *file, char __user *buf, size_t count, loff_t *offset);
+static ssize_t mychardev_write(struct file *file, const char __user *buf, size_t count, loff_t *offset);
+
+static const struct file_operations mychardev_fops = {
+    .owner      = THIS_MODULE,
+    .open       = mychardev_open,
+    .release    = mychardev_release,
+    .unlocked_ioctl = mychardev_ioctl,
+    .read       = mychardev_read,
+    .write       = mychardev_write
+};
+
+struct mychar_device_data {
     struct cdev cdev;
-    char buffer[BUF_LEN];
-    size_t size;
-    struct class*  cdrv_class;
-    struct device* cdrv_dev;
 };
 
-struct cdrv_device_data char_device[CDRV_MAX_MINORS];
-static ssize_t cdrv_write(struct file *file, const char __user *user_buffer,
-                    size_t size, loff_t * offset)
+static int dev_major = 0;
+static struct class *mychardev_class = NULL;
+static struct mychar_device_data mychardev_data[MAX_DEV];
+
+static int mychardev_uevent(struct device *dev, struct kobj_uevent_env *env)
 {
-    struct cdrv_device_data *cdrv_data = &char_device[0];
-    ssize_t len = min(cdrv_data->size - *offset, size);
-    printk("writing:bytes=%d\n",size);
-    if (len buffer + *offset, user_buffer, len))
-        return -EFAULT;
-
-    *offset += len;
-    return len;
+    add_uevent_var(env, "DEVMODE=%#o", 0666);
+    return 0;
 }
 
-static ssize_t cdrv_read(struct file *file, char __user *user_buffer,
-                   size_t size, loff_t *offset)
+static int __init mychardev_init(void)
 {
-    struct cdrv_device_data *cdrv_data = &char_device[0];
-    ssize_t len = min(cdrv_data->size - *offset, size);
+    int err, i;
+    dev_t dev;
 
-    if (len buffer + *offset, len))
-        return -EFAULT;
+    err = alloc_chrdev_region(&dev, 0, MAX_DEV, "mychardev");
 
-    *offset += len;
-    printk("read:bytes=%d\n",size);
-    return len;
-}
-static int cdrv_open(struct inode *inode, struct file *file){
-   printk(KERN_INFO "cdrv: Device open\n");
-   return 0;
-}
+    dev_major = MAJOR(dev);
 
-static int cdrv_release(struct inode *inode, struct file *file){
-   printk(KERN_INFO "cdrv: Device closed\n");
-   return 0;
-}
+    mychardev_class = class_create(THIS_MODULE, "mychardev");
+    mychardev_class->dev_uevent = mychardev_uevent;
 
-const struct file_operations cdrv_fops = {
-    .owner = THIS_MODULE,
-    .open = cdrv_open,
-    .read = cdrv_read,
-    .write = cdrv_write,
-    .release = cdrv_release,
-};
-int init_cdrv(void)
-{
-    int count, ret_val;
-    printk("Init the basic character driver...start\n");
-    ret_val = register_chrdev_region(MKDEV(CDRV_MAJOR, 0), CDRV_MAX_MINORS,
-                                 "cdrv_device_driver");
-    if (ret_val != 0) {
-        printk("register_chrdev_region():failed with error code:%d\n",ret_val);
-        return ret_val;
-    }
+    for (i = 0; i < MAX_DEV; i++) {
+        cdev_init(&mychardev_data[i].cdev, &mychardev_fops);
+        mychardev_data[i].cdev.owner = THIS_MODULE;
 
-    for(count = 0; count < CDRV_MAX_MINORS; count++) {
-        cdev_init(&char_device[count].cdev, &cdrv_fops);
-        cdev_add(&char_device[count].cdev, MKDEV(CDRV_MAJOR, count), 1);
-        char_device[count].cdrv_class = class_create(THIS_MODULE, CDRV_CLASS_NAME);
-        if (IS_ERR(char_device[count].cdrv_class)){
-             printk(KERN_ALERT "cdrv : register device class failed\n");
-             return PTR_ERR(char_device[count].cdrv_class);
-        }
-        char_device[count].size = BUF_LEN;
-        printk(KERN_INFO "cdrv device class registered successfully\n");
-        char_device[count].cdrv_dev = device_create(char_device[count].cdrv_class, NULL, MKDEV(CDRV_MAJOR, count), NULL, CDRV_DEVICE_NAME);
+        cdev_add(&mychardev_data[i].cdev, MKDEV(dev_major, i), 1);
 
+        device_create(mychardev_class, NULL, MKDEV(dev_major, i), NULL, "mychardev-%d", i);
     }
 
     return 0;
 }
 
-void cleanup_cdrv(void)
+static void __exit mychardev_exit(void)
 {
-    int count;
+    int i;
 
-    for(count = 0; count < CDRV_MAX_MINORS; count++) {
-        device_destroy(char_device[count].cdrv_class, &char_device[count].cdrv_dev);
-        class_destroy(char_device[count].cdrv_class);
-        cdev_del(&char_device[count].cdev);
+    for (i = 0; i < MAX_DEV; i++) {
+        device_destroy(mychardev_class, MKDEV(dev_major, i));
     }
-    unregister_chrdev_region(MKDEV(CDRV_MAJOR, 0), CDRV_MAX_MINORS);
-    printk("Exiting the basic character driver...\n");
+
+    class_unregister(mychardev_class);
+    class_destroy(mychardev_class);
+
+    unregister_chrdev_region(MKDEV(dev_major, 0), MINORMASK);
 }
-module_init(init_cdrv);
-module_exit(cleanup_cdrv);
+
+static int mychardev_open(struct inode *inode, struct file *file)
+{
+    printk("MYCHARDEV: Device open\n");
+    return 0;
+}
+
+static int mychardev_release(struct inode *inode, struct file *file)
+{
+    printk("MYCHARDEV: Device close\n");
+    return 0;
+}
+
+static long mychardev_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
+{
+    printk("MYCHARDEV: Device ioctl\n");
+    return 0;
+}
+
+static ssize_t mychardev_read(struct file *file, char __user *buf, size_t count, loff_t *offset)
+{
+    uint8_t *data = "Hello from the kernel world!\n";
+    size_t datalen = strlen(data);
+
+    printk("Reading device: %d\n", MINOR(file->f_path.dentry->d_inode->i_rdev));
+
+    if (count > datalen) {
+        count = datalen;
+    }
+
+    if (copy_to_user(buf, data, count)) {
+        return -EFAULT;
+    }
+
+    return count;
+}
+
+static ssize_t mychardev_write(struct file *file, const char __user *buf, size_t count, loff_t *offset)
+{
+    size_t maxdatalen = 30, ncopied;
+    uint8_t databuf[maxdatalen];
+
+    printk("Writing device: %d\n", MINOR(file->f_path.dentry->d_inode->i_rdev));
+
+    if (count < maxdatalen) {
+        maxdatalen = count;
+    }
+
+    ncopied = copy_from_user(databuf, buf, maxdatalen);
+
+    if (ncopied == 0) {
+        printk("Copied %zd bytes from the user\n", maxdatalen);
+    } else {
+        printk("Could't copy %zd bytes from the user\n", ncopied);
+    }
+
+    databuf[maxdatalen] = 0;
+
+    printk("Data from the user: %s\n", databuf);
+
+    return count;
+}
+
 MODULE_LICENSE("GPL");
-MODULE_AUTHOR("Sushil Rathore");
-MODULE_DESCRIPTION("Sample Character Driver");
-MODULE_VERSION("1.0");
+MODULE_AUTHOR("Oleg Kutkov <elenbert@gmail.com>");
+
+module_init(mychardev_init);
+module_exit(mychardev_exit);
