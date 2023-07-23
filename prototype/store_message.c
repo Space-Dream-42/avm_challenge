@@ -4,6 +4,7 @@
 #include <linux/device.h>
 #include <linux/kernel.h>
 #include <linux/uaccess.h>
+#include <linux/fs.h>
 
 MODULE_LICENSE("Dual BSD/GPL");
 #define CDRV_MAJOR 42
@@ -79,7 +80,6 @@ static ssize_t my_read(struct file *file, char __user *user_buffer, size_t count
 
 
 const struct file_operations fops = {
-    .owner = THIS_MODULE, // What is THIS_MODULE supposed to be?
     .read = my_read,
     .write = my_write,
     .open = my_open,
