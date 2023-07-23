@@ -35,7 +35,7 @@ static ssize_t my_write(struct file *file, const char __user *user_buffer, size_
 {
     ssize_t bytes_written;
 
-    printk("You called the syscall write");
+    printk(KERN_ALERT "You called the syscall write");
     if(count > BUF_LEN) {
         return -EINVAL;
     }
@@ -49,14 +49,14 @@ static ssize_t my_write(struct file *file, const char __user *user_buffer, size_
     bytes_written = count;
     char_device.size = bytes_written;
 
-    printk("Hello I am in the kernel mode and wrote things to the device.");
+    printk(KERN_ALERT "Hello I am in the kernel mode and wrote things to the device.");
     return bytes_written;
 }
 
 static ssize_t my_read(struct file *file, char __user *user_buffer, size_t count, loff_t *ppos)
 {
     ssize_t bytes_read;
-    printk("You called the syscall read.");
+    printk(KERN_ALERT "You called the syscall read.");
 
     // Make sure our user isn't trying to read more data than there is.
     if(count > char_device.size) {
@@ -82,7 +82,7 @@ static ssize_t my_read(struct file *file, char __user *user_buffer, size_t count
     *ppos += count;
     bytes_read = count;
 
-    printk("Hello I am in the kernel mode and read things to the device.");
+    printk(KERN_ALERT "Hello I am in the kernel mode and read things to the device.");
     return bytes_read;
 }
 
@@ -98,15 +98,15 @@ const struct file_operations fops = {
     .open = my_open,
 };
 
-static int init(void)
+static int __init my_init(void)
 {
     // TO-DO: Error handling
 
     int err;
-    dev_t dev;
+    dev_t dev; // This is 32 bit quantity with 12 bit for the major and 20 bit for the minor
     printk(KERN_ALERT "Initializing store_message driver...start\n");
 
-    err = alloc_chrdev_region(&dev, 0, NUM_OF_DEVICES, DEVICE_NAME); // the major will get stored in dev, and 0 is the first minor number
+    err = alloc_chrdev_region(&dev, 0, NUM_OF_DEVICES, DEVICE_NAME); // the major and minor will get stored in dev and will be dynamically produced by this function, and 0 is the starting number for the nummeration of the minors
 
     dev_major = MAJOR(dev);
 
@@ -128,7 +128,7 @@ static int init(void)
     return 0;
 }
 
-static void exit(void)
+static void __exit my_exit(void)
 {
     // TO-DO: Error Handling
     device_destroy(mychardev_class, MKDEV(dev_major, 0));
