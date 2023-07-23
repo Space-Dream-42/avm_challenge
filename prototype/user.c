@@ -1,7 +1,7 @@
 #include<stdio.h>
 #include <fcntl.h>
 #include <unistd.h>
-#define DEVICE_FILE "/dev/cdrv_dev"
+#define DEVICE_FILE "/dev/store-message-dev-0"
 #include <stddef.h>
 #include <string.h>
 
