@@ -38,7 +38,8 @@ int main()
 
     // now read out the data on the device
     read_bytes = read(rc, read_buff, count);
-    printf("%s", read_buff);
+    printf("%s\n", read_buff);
+    printf("We are here!");
 
     if(close(fd) < 0)
     {
