@@ -141,5 +141,5 @@ static void __exit my_exit(void)
 
 
 
-module_init(init);
-module_exit(exit);
+module_init(my_init);
+module_exit(my_exit);
