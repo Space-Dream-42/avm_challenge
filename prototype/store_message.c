@@ -119,7 +119,7 @@ static int __init my_init(void)
     cdev_init(&char_device.cdev, &fops);
     char_device.cdev.owner = THIS_MODULE;
     
-    // Now add the device to the system.
+    // Inform the Kernel about your new device 
     cdev_add(&char_device.cdev, MKDEV(dev_major, 0), 1);
 
 
