@@ -119,6 +119,8 @@ static int init(void)
 
 
     device_create(mychardev_class, NULL, MKDEV(dev_major, 0), NULL, "store-message-dev-0");
+
+    return 0;
 }
 
 static void exit(void)
@@ -128,7 +130,7 @@ static void exit(void)
     class_unregister(mychardev_class);
     class_destroy(mychardev_class);
     unregister_chrdev_region(MKDEV(dev_major, 0), MINORMASK);
-    
+
     printk(KERN_ALERT "Deloading store_message driver...done\n");
 }
 
