@@ -3,6 +3,7 @@
 #include <unistd.h>
 #define DEVICE_FILE "/dev/cdrv_dev"
 #include <stddef.h>
+#include <string.h>
 
 char *data = "test data";
 
