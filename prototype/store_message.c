@@ -47,6 +47,8 @@ static ssize_t my_write(struct file *file, const char __user *user_buffer, size_
 
     bytes_written = count;
     char_device.size = bytes_written;
+
+    printk("Hello I am in the kernel mode and wrote things to the device.");
     return bytes_written;
 }
 
@@ -78,6 +80,7 @@ static ssize_t my_read(struct file *file, char __user *user_buffer, size_t count
     *ppos += count;
     bytes_read = count;
 
+    printk("Hello I am in the kernel mode and read things to the device.");
     return bytes_read;
 }
 
