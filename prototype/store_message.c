@@ -55,13 +55,24 @@ static ssize_t my_write(struct file *file, const char __user *user_buffer, size_
     ssize_t bytes_written;
     struct list_elem *new_elem;
 
-    if (count > WORD_LEN)
+    if(char_device.list_len > MAX_LIST_LEN)
+    {
+        printk(KERN_ALERT "List is full. No word can be stored anymore.");
+        return -ENOSPC;
+    } 
+
+    if(count > WORD_LEN)
     {
         printk(KERN_ALERT "Word is too long and cannot be inserted");
         return -EINVAL;
     }
 
     new_elem = (struct list_elem*) kmalloc(sizeof(struct list_elem), GFP_KERNEL);
+    if(new_elem == NULL)
+    {
+        printk(KERN_ALERT "List is full. No word can be stored anymore.");
+        return -ENOMEM;
+    }
 
     // does return the number of bytes that could not be copied
     if(copy_from_user(new_elem->word, user_buffer, count) != 0) {

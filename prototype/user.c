@@ -40,8 +40,6 @@ int main()
         return -1;
     }
 
-    printf("Written data: %s\n",rc,sample_data_1);
-
     // now read out the data on the device
     read_bytes = read(fd, read_buff, 4);
     printf("Read data: %s\n", read_buff);
