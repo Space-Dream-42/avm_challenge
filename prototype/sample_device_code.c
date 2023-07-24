@@ -1,144 +1,86 @@
 #include <linux/init.h>
 #include <linux/module.h>
-#include <linux/cdev.h>
-#include <linux/device.h>
 #include <linux/kernel.h>
-#include <linux/uaccess.h>
-#include <linux/fs.h>
+#include <linux/list.h>
+#include <linux/slab.h>
+#include <linux/timer.h>
 
-#define MAX_DEV 2
-
-static int mychardev_open(struct inode *inode, struct file *file);
-static int mychardev_release(struct inode *inode, struct file *file);
-static long mychardev_ioctl(struct file *file, unsigned int cmd, unsigned long arg);
-static ssize_t mychardev_read(struct file *file, char __user *buf, size_t count, loff_t *offset);
-static ssize_t mychardev_write(struct file *file, const char __user *buf, size_t count, loff_t *offset);
-
-static const struct file_operations mychardev_fops = {
-    .owner      = THIS_MODULE,
-    .open       = mychardev_open,
-    .release    = mychardev_release,
-    .unlocked_ioctl = mychardev_ioctl,
-    .read       = mychardev_read,
-    .write       = mychardev_write
+struct word_node {
+    char *word;
+    struct list_head list;
 };
 
-struct mychar_device_data {
-    struct cdev cdev;
-};
+static LIST_HEAD(word_list);
+static DEFINE_MUTEX(word_list_mutex);
+static struct timer_list word_timer;
 
-static int dev_major = 0;
-static struct class *mychardev_class = NULL;
-static struct mychar_device_data mychardev_data[MAX_DEV];
+void write_word_to_log(struct timer_list *t) {
+    struct word_node *node;
 
-static int mychardev_uevent(struct device *dev, struct kobj_uevent_env *env)
-{
-    add_uevent_var(env, "DEVMODE=%#o", 0666);
-    return 0;
-}
+    mutex_lock(&word_list_mutex);
 
-static int __init mychardev_init(void)
-{
-    int err, i;
-    dev_t dev;
-
-    err = alloc_chrdev_region(&dev, 0, MAX_DEV, "mychardev");
-
-    dev_major = MAJOR(dev);
-
-    mychardev_class = class_create(THIS_MODULE, "mychardev");
-    mychardev_class->dev_uevent = mychardev_uevent;
-
-    for (i = 0; i < MAX_DEV; i++) {
-        cdev_init(&mychardev_data[i].cdev, &mychardev_fops);
-        mychardev_data[i].cdev.owner = THIS_MODULE;
-
-        cdev_add(&mychardev_data[i].cdev, MKDEV(dev_major, i), 1);
-
-        device_create(mychardev_class, NULL, MKDEV(dev_major, i), NULL, "mychardev-%d", i);
+    if (!list_empty(&word_list)) {
+        node = list_first_entry(&word_list, struct word_node, list);
+        printk(KERN_INFO "Word: %s\n", node->word);
+        list_del(&node->list);
+        kfree(node->word);
+        kfree(node);
     }
 
+    mutex_unlock(&word_list_mutex);
+
+    mod_timer(&word_timer, jiffies + msecs_to_jiffies(1000));
+}
+
+static int __init mod_init(void) {
+    printk(KERN_INFO "Module loaded\n");
+
+    timer_setup(&word_timer, write_word_to_log, 0);
+    mod_timer(&word_timer, jiffies + msecs_to_jiffies(1000));
+
     return 0;
 }
 
-static void __exit mychardev_exit(void)
-{
-    int i;
+static void __exit mod_exit(void) {
+    struct word_node *node, *tmp;
 
-    for (i = 0; i < MAX_DEV; i++) {
-        device_destroy(mychardev_class, MKDEV(dev_major, i));
+    del_timer_sync(&word_timer);
+
+    mutex_lock(&word_list_mutex);
+
+    list_for_each_entry_safe(node, tmp, &word_list, list) {
+        list_del(&node->list);
+        kfree(node->word);
+        kfree(node);
     }
 
-    class_unregister(mychardev_class);
-    class_destroy(mychardev_class);
+    mutex_unlock(&word_list_mutex);
 
-    unregister_chrdev_region(MKDEV(dev_major, 0), MINORMASK);
+    printk(KERN_INFO "Module unloaded\n");
 }
 
-static int mychardev_open(struct inode *inode, struct file *file)
-{
-    printk("MYCHARDEV: Device open\n");
-    return 0;
-}
+static ssize_t mod_write(struct file *file, const char __user *ubuf, size_t count, loff_t *ppos) {
+    char *word;
+    struct word_node *node;
 
-static int mychardev_release(struct inode *inode, struct file *file)
-{
-    printk("MYCHARDEV: Device close\n");
-    return 0;
-}
-
-static long mychardev_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
-{
-    printk("MYCHARDEV: Device ioctl\n");
-    return 0;
-}
-
-static ssize_t mychardev_read(struct file *file, char __user *buf, size_t count, loff_t *offset)
-{
-    uint8_t *data = "Hello from the kernel world!\n";
-    size_t datalen = strlen(data);
-
-    printk("Reading device: %d\n", MINOR(file->f_path.dentry->d_inode->i_rdev));
-
-    if (count > datalen) {
-        count = datalen;
-    }
-
-    if (copy_to_user(buf, data, count)) {
+    word = kmalloc(count+1, GFP_KERNEL);
+    if (copy_from_user(word, ubuf, count))
         return -EFAULT;
-    }
+    word[count] = '\0';
+
+    node = kmalloc(sizeof(*node), GFP_KERNEL);
+    node->word = word;
+
+    mutex_lock(&word_list_mutex);
+    list_add_tail(&node->list, &word_list);
+    mutex_unlock(&word_list_mutex);
 
     return count;
 }
 
-static ssize_t mychardev_write(struct file *file, const char __user *buf, size_t count, loff_t *offset)
-{
-    size_t maxdatalen = 30, ncopied;
-    uint8_t databuf[maxdatalen];
-
-    printk("Writing device: %d\n", MINOR(file->f_path.dentry->d_inode->i_rdev));
-
-    if (count < maxdatalen) {
-        maxdatalen = count;
-    }
-
-    ncopied = copy_from_user(databuf, buf, maxdatalen);
-
-    if (ncopied == 0) {
-        printk("Copied %zd bytes from the user\n", maxdatalen);
-    } else {
-        printk("Could't copy %zd bytes from the user\n", ncopied);
-    }
-
-    databuf[maxdatalen] = 0;
-
-    printk("Data from the user: %s\n", databuf);
-
-    return count;
-}
+// We'll leave the read function as an exercise for you!
 
 MODULE_LICENSE("GPL");
-MODULE_AUTHOR("Oleg Kutkov <elenbert@gmail.com>");
 
-module_init(mychardev_init);
-module_exit(mychardev_exit);
+module_init(mod_init);
+module_exit(mod_exit);

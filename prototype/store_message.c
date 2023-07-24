@@ -46,6 +46,8 @@ static ssize_t my_write(struct file *file, const char __user *user_buffer, size_
         return -EFAULT;
     }
 
+    printk();
+
     bytes_written = count;
     char_device.size = bytes_written;
 
@@ -62,24 +64,13 @@ static ssize_t my_read(struct file *file, char __user *user_buffer, size_t count
     if(count > char_device.size) {
         count = char_device.size;
     }
-
-    // If the position is behind the device's size, there is nothing to read.
-    if (*ppos >= char_device.size) {
-        return 0;
-    }
-
-    // Don't read across the buffer's end.
-    if (*ppos + count > char_device.size) {
-        count = char_device.size - *ppos;
-    }
+    printk(KERN_ALERT "%s", char_device.buffer);
 
     // Copy data from the buffer to the user buffer.
-    if(copy_to_user(user_buffer, char_device.buffer + *ppos, count) != 0) {
+    if(copy_to_user(user_buffer, char_device.buffer, count) != 0) {
         return -EFAULT;
     }
 
-    // Update our bookkeeping of where the file has been read up to.
-    *ppos += count;
     bytes_read = count;
 
     printk(KERN_ALERT "Hello I am in the kernel mode and read things to the device.");
