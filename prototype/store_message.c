@@ -123,7 +123,7 @@ static int __init my_init(void)
 
     // Initialize the head of the list
     strncpy(char_device.word_list_head.word, ". Start:", WORD_LEN);
-    LIST_HEAD(&(char_device.word_list_head.my_list));
+    INIT_LIST_HEAD(&(char_device.word_list_head.my_list));
     char_device.list_len = 1;
 
     // TO-DO: Error handling
