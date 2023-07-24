@@ -218,7 +218,6 @@ static void __exit my_exit(void)
     if(IS_ERR(device_destroy(mychardev_class, MKDEV(dev_major, 0))))
     {
         printk(KERN_ALERT "Failed to perform device_destroy function.\n");
-        return -1;
     }
     
     class_unregister(mychardev_class);
