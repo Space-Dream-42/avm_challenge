@@ -78,9 +78,10 @@ static ssize_t my_read(struct file *file, char __user *user_buffer, size_t count
     struct list_elem *current_elem;
     char *concatenated_words;
     int total_len = 0;
+    char *space = ", ";
 
     // Allocate memory for the concatenated words
-    concatenated_words = kmalloc(count * WORD_LEN, GFP_KERNEL);
+    concatenated_words = kmalloc(count * WORD_LEN + 3, GFP_KERNEL);
     if (!concatenated_words) {
         return -ENOMEM;
     }
@@ -103,7 +104,8 @@ static ssize_t my_read(struct file *file, char __user *user_buffer, size_t count
         }
 
         strncat(concatenated_words, current_elem->word, WORD_LEN);
-        total_len += strlen(current_elem->word);
+        strncat(concatenated_words, space, 3);
+        total_len += strlen(current_elem->word) + 3;
     }
     words_read = count;
 
