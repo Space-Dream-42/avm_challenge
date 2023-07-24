@@ -104,8 +104,17 @@ static ssize_t my_read(struct file *file, char __user *user_buffer, size_t count
         }
 
         strncat(concatenated_words, current_elem->word, WORD_LEN);
-        strncat(concatenated_words, space, 3);
-        total_len += strlen(current_elem->word) + 3;
+        
+        if (i == 0 || i == count)
+        {
+            total_len += strlen(current_elem->word);
+        }
+        else
+        {
+            strncat(concatenated_words, space, 3);
+            total_len += strlen(current_elem->word) + 3;
+        }
+        
     }
     words_read = count;
 
