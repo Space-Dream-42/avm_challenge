@@ -142,11 +142,7 @@ static int mychardev_uevent(struct device *dev, struct kobj_uevent_env *env)
 
 void print_list(struct timer_list *data)
 {   
-    char str[WORD_LEN + 20];
-    str = KERN_ALERT;
-    strncat(str, elem_to_print->word, WORD_LEN);
-    
-    printk(str);
+    printk(KERN_ALERT "%s\n", elem_to_print->word);
     elem_to_print = list_entry((elem_to_print->my_list).next, struct list_elem, my_list);
     
     mod_timer(&print_timer, msecs_to_jiffies(TIMEOUT));
@@ -169,7 +165,7 @@ static int __init my_init(void)
     char_device.list_len = 1;
 
     // Initialize the print timer
-    timer_setup(print_timer, print_list, 0);
+    timer_setup(&print_timer, print_list, 0);
     mod_timer(&print_timer, msecs_to_jiffies(TIMEOUT));
     elem_to_print = &(char_device.word_list_head);
 
