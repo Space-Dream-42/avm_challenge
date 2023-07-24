@@ -10,6 +10,7 @@
 #include <linux/string.h>
 #include <linux/timer.h>
 #include <linux/jiffies.h>
+#include <linux/mutex.h>
 
 MODULE_LICENSE("Dual BSD/GPL");
 #define CDRV_MAJOR 42
@@ -40,7 +41,7 @@ static struct class *mychardev_class = NULL;
 static int dev_major = 0;
 struct timer_list print_timer;
 struct list_elem *elem_to_print;
-
+static DEFINE_MUTEX(my_mutex)
 
 static int my_open(struct inode *inode, struct file *file)
 {
@@ -67,7 +68,9 @@ static ssize_t my_write(struct file *file, const char __user *user_buffer, size_
         return -EFAULT;
     }
 
+    mutex_lock(my_mutex);
     list_add_tail(&(new_elem->my_list), &(char_device.word_list_head.my_list));
+    mutex_unlock(my_mutex);
 
     bytes_written = count;
     char_device.list_len += 1;
@@ -77,7 +80,6 @@ static ssize_t my_write(struct file *file, const char __user *user_buffer, size_
 
 static ssize_t my_read(struct file *file, char __user *user_buffer, size_t count, loff_t *ppos)
 {
-    // program a for loop which is looping count times
     int words_read;
     int i;
     struct list_elem *current_elem;
@@ -85,14 +87,12 @@ static ssize_t my_read(struct file *file, char __user *user_buffer, size_t count
     int total_len = 0;
     char *space = ", ";
 
-    // Allocate memory for the concatenated words
     concatenated_words = kmalloc(count * WORD_LEN + 3, GFP_KERNEL);
     if (!concatenated_words) {
         return -ENOMEM;
     }
-    concatenated_words[0] = '\0'; // Initialize the string
+    concatenated_words[0] = '\0'; 
 
-    // Make sure our user isn't trying to read more data than there is.
     if(count > char_device.list_len) {
         count = char_device.list_len;
     }
@@ -123,7 +123,8 @@ static ssize_t my_read(struct file *file, char __user *user_buffer, size_t count
     }
     words_read = count;
 
-    if(copy_to_user(user_buffer, concatenated_words, total_len + 1) != 0) {
+    if(copy_to_user(user_buffer, concatenated_words, total_len + 1) != 0)
+    {
         kfree(concatenated_words);
         return -EFAULT;
     }
@@ -142,7 +143,7 @@ static int mychardev_uevent(struct device *dev, struct kobj_uevent_env *env)
 
 void print_list_elem(struct timer_list *data)
 {   
-    printk(KERN_ALERT "%s\n", elem_to_print->word);
+    printk("%s\n", elem_to_print->word);
     elem_to_print = list_entry((elem_to_print->my_list).next, struct list_elem, my_list);
     
     mod_timer(&print_timer, jiffies + msecs_to_jiffies(TIMEOUT));
@@ -160,7 +161,7 @@ static int __init my_init(void)
     dev_t dev; // This is 32 bit quantity with 12 bit for the major and 20 bit for the minor
 
     // Initialize the head of the list
-    strncpy(char_device.word_list_head.word, ". Start:", WORD_LEN);
+    strncpy(char_device.word_list_head.word, "Start:", WORD_LEN);
     INIT_LIST_HEAD(&(char_device.word_list_head.my_list));
     char_device.list_len = 1;
 
@@ -189,7 +190,6 @@ static int __init my_init(void)
     // Inform the Kernel about your new device 
     cdev_add(&char_device.cdev, MKDEV(dev_major, 0), 1);
 
-
     device_create(mychardev_class, NULL, MKDEV(dev_major, 0), NULL, "store-message-dev-0");
 
     return 0;
@@ -206,8 +206,6 @@ static void __exit my_exit(void)
 
     printk(KERN_ALERT "Deloading store_message driver...done\n");
 }
-
-
 
 module_init(my_init);
 module_exit(my_exit);
