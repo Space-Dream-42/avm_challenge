@@ -6,7 +6,7 @@
 #include <linux/uaccess.h>
 #include <linux/fs.h>
 #include <linux/list.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 
 MODULE_LICENSE("Dual BSD/GPL");
 #define CDRV_MAJOR 42
