@@ -90,7 +90,7 @@ static ssize_t my_read(struct file *file, char __user *user_buffer, size_t count
         }
         else
         {
-            current_elem = list_entry(&(current_elem->my_list), struct list_elem, my_list);
+            current_elem = list_entry((current_elem->my_list).next, struct list_elem, my_list);
         }
 
         if(copy_to_user(user_buffer, (current_elem->word), sizeof(current_elem->word)) != 0) {
