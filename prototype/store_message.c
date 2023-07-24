@@ -8,6 +8,8 @@
 #include <linux/list.h>
 #include <linux/slab.h>
 #include <linux/string.h>
+#include <linux/timer.h>
+#include <linux/jiffies.h>
 
 MODULE_LICENSE("Dual BSD/GPL");
 #define CDRV_MAJOR 42
@@ -16,6 +18,7 @@ MODULE_LICENSE("Dual BSD/GPL");
 #define NUM_OF_DEVICES 1
 #define MAX_LIST_LEN 100
 #define DEVICE_NAME "store_message"
+#define TIMEOUT "1000"
 
 
 struct list_elem
@@ -35,6 +38,8 @@ struct cdrv_device_data
 struct cdrv_device_data char_device;
 static struct class *mychardev_class = NULL;
 static int dev_major = 0;
+struct timer_list print_timer;
+struct list_elem *elem_to_print;
 
 
 static int my_open(struct inode *inode, struct file *file)
@@ -104,7 +109,7 @@ static ssize_t my_read(struct file *file, char __user *user_buffer, size_t count
         }
 
         strncat(concatenated_words, current_elem->word, WORD_LEN);
-        
+
         if (i == 0 || i == count)
         {
             total_len += strlen(current_elem->word);
@@ -135,6 +140,15 @@ static int mychardev_uevent(struct device *dev, struct kobj_uevent_env *env)
     return 0;
 }
 
+void print_list(struct timer_list *data)
+{
+    // Now print a word
+    printk(KERN_ALERT elem_to_print->word)
+    elem_to_print = list_entry((elem_to_print->my_list).next, struct list_elem, my_list);
+    
+    mod_timer(&print_timer, msecs_to_jiffies(TIMEOUT));
+}
+
 const struct file_operations fops = {
     .read = my_read,
     .write = my_write,
@@ -150,6 +164,11 @@ static int __init my_init(void)
     strncpy(char_device.word_list_head.word, ". Start:", WORD_LEN);
     INIT_LIST_HEAD(&(char_device.word_list_head.my_list));
     char_device.list_len = 1;
+
+    // Initialize the print timer
+    setup_timer(print_timer, print_list, 0);
+    mod_timer(&print_timer, msecs_to_jiffies(TIMEOUT));
+    elem_to_print = &(char_device.word_list_head);
 
     // TO-DO: Error handling
     printk(KERN_ALERT "Initializing store_message driver...start\n");
@@ -178,6 +197,7 @@ static int __init my_init(void)
 
 static void __exit my_exit(void)
 {
+    del_timer(&print_timer);
     // TO-DO: Error Handling
     device_destroy(mychardev_class, MKDEV(dev_major, 0));
     class_unregister(mychardev_class);
