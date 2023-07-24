@@ -5,7 +5,10 @@
 #include <stddef.h>
 #include <string.h>
 
-char *data = "Oppenheimer";
+char *sample_data_1 = "Oppenheimer";
+char *sample_data_2 = "Einstein";
+char *sample_data_3 = "Planck";
+char *sample_data_4 = "Heisenberg";
 
 int main()
 {
@@ -26,7 +29,10 @@ int main()
     }
 
     // convey some data to the device
-    rc = write(fd,data,strlen(data)+1);
+    rc = write(fd,sample_data_1,strlen(sample_data_1)+1);
+    rc = write(fd,sample_data_2,strlen(sample_data_2)+1);
+    rc = write(fd,sample_data_3,strlen(sample_data_3)+1);
+    rc = write(fd,sample_data_4,strlen(sample_data_4)+1);
 
     if(rc<0)
     {
@@ -34,10 +40,10 @@ int main()
         return -1;
     }
 
-    printf("written bytes=%d,data=%s\n",rc,data);
+    printf("written bytes=%d,data=%s\n",rc,sample_data_1);
 
     // now read out the data on the device
-    read_bytes = read(fd, read_buff, 1);
+    read_bytes = read(fd, read_buff, 4);
     printf("%s\n", read_buff);
     printf("We are here!");
 
