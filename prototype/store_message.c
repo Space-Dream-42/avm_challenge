@@ -5,25 +5,36 @@
 #include <linux/kernel.h>
 #include <linux/uaccess.h>
 #include <linux/fs.h>
+#include <linux/list.h>
 
 MODULE_LICENSE("Dual BSD/GPL");
 #define CDRV_MAJOR 42
-#define BUF_LEN 256
+#define WORD_LEN 64
 #define CDRV_MAX_MINORS 1
 #define NUM_OF_DEVICES 1
+#define MAX_LIST_LEN 100
 #define DEVICE_NAME "store_message"
 
 
-struct cdrv_device_data {
+
+struct list_elem
+{
+    struct list my_list;
+    char word[WORD_LEN];
+};
+
+struct cdrv_device_data 
+{
     struct cdev cdev; // imported from cdev.h
-    char buffer[BUF_LEN];
-    size_t size;
+    struct list_elem word_list_head;
+    int list_len;
     struct device* cdrv_dev; // imported from device.h
 };
 
 struct cdrv_device_data char_device;
 static struct class *mychardev_class = NULL;
 static int dev_major = 0;
+
 
 static int my_open(struct inode *inode, struct file *file)
 {
@@ -35,44 +46,62 @@ static ssize_t my_write(struct file *file, const char __user *user_buffer, size_
 {
     ssize_t bytes_written;
 
-    printk(KERN_ALERT "You called the syscall write");
-    if(count > BUF_LEN) {
-        return -EINVAL;
+    if (count > WORD_LEN)
+    {
+        printk(KERN_ALERT "Word is too long and cannot be inserted");
+        return -EINVAL
     }
 
+    struct list_elem *new_elem;
+    new_elem = kmalloc(sizeof(struct list_elem), GFP_KERNEL);
+
     // does return the number of bytes that could not be copied
-    if(copy_from_user(char_device.buffer, user_buffer, count) != 0) {
-        printk("Copying the data form user space to kernel space.\n");
+    if(copy_from_user(new_elem->word, user_buffer, count) != 0) {
+        printk("Faild to copying all data form user space to kernel space.\n");
         return -EFAULT;
     }
 
-    bytes_written = count;
-    char_device.size = bytes_written;
+    list_add_tail(&(new_elem->my_list), &(char_device.word_list_head));
 
-    printk(KERN_ALERT "Hello I am in the kernel mode and wrote things to the device.");
+    bytes_written = count;
+    char_device.list_len += 1;
+
     return bytes_written;
 }
 
 static ssize_t my_read(struct file *file, char __user *user_buffer, size_t count, loff_t *ppos)
 {
-    ssize_t bytes_read;
-    printk(KERN_ALERT "You called the syscall read.");
+    // program a for loop which is looping count times
+    int words_read;
+    int i;
 
     // Make sure our user isn't trying to read more data than there is.
-    if(count > char_device.size) {
-        count = char_device.size;
-    }
-    printk(KERN_ALERT "%s", char_device.buffer);
-
-    // Copy data from the buffer to the user buffer.
-    if(copy_to_user(user_buffer, char_device.buffer, count) != 0) {
-        return -EFAULT;
+    if(count > char_device.list_len) {
+        count = char_device.list_len;
     }
 
-    bytes_read = count;
 
-    printk(KERN_ALERT "Hello I am in the kernel mode and read things to the device.");
-    return bytes_read;
+    struct list_elem *current_elem;
+    for(i = 0; i < count; i++)
+    {
+        if(i == 0)
+        {
+            current_elem = &char_device.word_list_head;
+        }
+        else
+        {
+            current_elem = list_entry(&(current_elem.my_list), struct list_elem, my_list);
+        }
+
+        if(copy_to_user(user_buffer, (current_elem->word) ", ", sizeof(current_elem->word) + 3) != 0) {
+            return -EFAULT;
+        }
+        user_buffer += sizeof(current_elem->word) + 3;
+
+    }
+    words_read = count;
+
+    return words_read;
 }
 
 static int mychardev_uevent(struct device *dev, struct kobj_uevent_env *env)
@@ -89,8 +118,12 @@ const struct file_operations fops = {
 
 static int __init my_init(void)
 {
-    // TO-DO: Error handling
+    // Initialize the head of the list
+    char_device.word_list_head.word = ". Start:";
+    LIST_HEAD(&(char_device.word_list_head.my_list));
+    char_device.list_len = 1;
 
+    // TO-DO: Error handling
     int err;
     dev_t dev; // This is 32 bit quantity with 12 bit for the major and 20 bit for the minor
     printk(KERN_ALERT "Initializing store_message driver...start\n");

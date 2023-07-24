@@ -5,7 +5,7 @@
 #include <stddef.h>
 #include <string.h>
 
-char *data = "test data";
+char *data = "Oppenheimer";
 
 int main()
 {
@@ -37,7 +37,7 @@ int main()
     printf("written bytes=%d,data=%s\n",rc,data);
 
     // now read out the data on the device
-    read_bytes = read(fd, read_buff, count);
+    read_bytes = read(fd, read_buff, 1);
     printf("%s\n", read_buff);
     printf("We are here!");
 
