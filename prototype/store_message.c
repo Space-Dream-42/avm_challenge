@@ -11,6 +11,7 @@
 #include <linux/timer.h>
 #include <linux/jiffies.h>
 #include <linux/mutex.h>
+#include <linux/err.h
 
 MODULE_LICENSE("Dual BSD/GPL");
 #define CDRV_MAJOR 42
@@ -171,26 +172,42 @@ static int __init my_init(void)
     add_timer(&print_timer);
     elem_to_print = &(char_device.word_list_head);
 
-    // TO-DO: Error handling
     printk(KERN_ALERT "Initializing store_message driver...start\n");
 
     err = alloc_chrdev_region(&dev, 0, NUM_OF_DEVICES, DEVICE_NAME); // the major and minor will get stored in dev and will be dynamically produced by this function, and 0 is the starting number for the nummeration of the minors
 
+    if(err < 0)
+    {
+        printk(KERN_ALERT "Failed to perform alloc_chrdev_region function.\n");
+        return -1;
+    }
+
     dev_major = MAJOR(dev);
 
-    // sysfs is a virtual file system which is providing information about various kernel subsystems (like device drivers, or hardware devices)
-    // sysfs can be found in /sys/
     mychardev_class = class_create(THIS_MODULE, DEVICE_NAME); // creates sysfs class with paths for each character devices, this object can be carried to device_create. After the invocation you can see the devices under /dev/
+    
+    if(IS_ERR(mychardev_class))
+    {
+        printk(KERN_ALERT "Failed to perform class_create function.\n");
+        return -1;
+    }
+
     mychardev_class->dev_uevent = mychardev_uevent;
 
-    // Now it’s time to initialize a new character device and set file_operations with cdev_init.
     cdev_init(&char_device.cdev, &fops);
     char_device.cdev.owner = THIS_MODULE;
     
-    // Inform the Kernel about your new device 
-    cdev_add(&char_device.cdev, MKDEV(dev_major, 0), 1);
+    if(cdev_add(&char_device.cdev, MKDEV(dev_major, 0), 1) < 0)
+    {
+        printk(KERN_ALERT "Failed to perform cdev_add function.\n");
+        return -1;
+    }
 
-    device_create(mychardev_class, NULL, MKDEV(dev_major, 0), NULL, "store-message-dev-0");
+    if(IS_ERR(device_create(mychardev_class, NULL, MKDEV(dev_major, 0), NULL, "store-message-dev-0")))
+    {
+        printk(KERN_ALERT "Failed to perform device_create function.\n");
+        return -1;
+    }
 
     return 0;
 }
@@ -198,8 +215,12 @@ static int __init my_init(void)
 static void __exit my_exit(void)
 {
     del_timer(&print_timer);
-    // TO-DO: Error Handling
-    device_destroy(mychardev_class, MKDEV(dev_major, 0));
+    if(IS_ERR(device_destroy(mychardev_class, MKDEV(dev_major, 0))))
+    {
+        printk(KERN_ALERT "Failed to perform device_destroy function.\n");
+        return -1;
+    }
+    
     class_unregister(mychardev_class);
     class_destroy(mychardev_class);
     unregister_chrdev_region(MKDEV(dev_major, 0), MINORMASK);
