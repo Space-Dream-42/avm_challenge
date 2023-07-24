@@ -76,6 +76,15 @@ static ssize_t my_read(struct file *file, char __user *user_buffer, size_t count
     int words_read;
     int i;
     struct list_elem *current_elem;
+    char *concatenated_words;
+    int total_len = 0;
+
+    // Allocate memory for the concatenated words
+    concatenated_words = kmalloc(count * WORD_LEN, GFP_KERNEL);
+    if (!concatenated_words) {
+        return -ENOMEM;
+    }
+    concatenated_words[0] = '\0'; // Initialize the string
 
     // Make sure our user isn't trying to read more data than there is.
     if(count > char_device.list_len) {
@@ -93,16 +102,21 @@ static ssize_t my_read(struct file *file, char __user *user_buffer, size_t count
             current_elem = list_entry((current_elem->my_list).next, struct list_elem, my_list);
         }
 
-        if(copy_to_user(user_buffer, (current_elem->word), sizeof(current_elem->word)) != 0) {
-            return -EFAULT;
-        }
-        user_buffer += sizeof(current_elem->word);
-
+        strncat(concatenated_words, current_elem->word, WORD_LEN);
+        total_len += strlen(current_elem->word);
     }
     words_read = count;
 
+    if(copy_to_user(user_buffer, concatenated_words, total_len + 1) != 0) {
+        kfree(concatenated_words);
+        return -EFAULT;
+    }
+
+    kfree(concatenated_words);
+
     return words_read;
 }
+
 
 static int mychardev_uevent(struct device *dev, struct kobj_uevent_env *env)
 {
