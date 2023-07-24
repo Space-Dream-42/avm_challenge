@@ -215,11 +215,7 @@ static int __init my_init(void)
 static void __exit my_exit(void)
 {
     del_timer(&print_timer);
-    if(IS_ERR(device_destroy(mychardev_class, MKDEV(dev_major, 0))))
-    {
-        printk(KERN_ALERT "Failed to perform device_destroy function.\n");
-    }
-    
+    device_destroy(mychardev_class, MKDEV(dev_major, 0));
     class_unregister(mychardev_class);
     class_destroy(mychardev_class);
     unregister_chrdev_region(MKDEV(dev_major, 0), MINORMASK);
