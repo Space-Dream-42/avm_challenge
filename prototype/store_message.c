@@ -46,8 +46,6 @@ static ssize_t my_write(struct file *file, const char __user *user_buffer, size_
         return -EFAULT;
     }
 
-    printk();
-
     bytes_written = count;
     char_device.size = bytes_written;
 
