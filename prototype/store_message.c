@@ -6,6 +6,7 @@
 #include <linux/uaccess.h>
 #include <linux/fs.h>
 #include <linux/list.h>
+#include <linux/malloc.h>
 
 MODULE_LICENSE("Dual BSD/GPL");
 #define CDRV_MAJOR 42
@@ -19,7 +20,7 @@ MODULE_LICENSE("Dual BSD/GPL");
 
 struct list_elem
 {
-    struct list my_list;
+    struct list_head my_list;
     char word[WORD_LEN];
 };
 
@@ -45,15 +46,15 @@ static int my_open(struct inode *inode, struct file *file)
 static ssize_t my_write(struct file *file, const char __user *user_buffer, size_t count, loff_t * ppos)
 {
     ssize_t bytes_written;
+    struct list_elem *new_elem;
 
     if (count > WORD_LEN)
     {
         printk(KERN_ALERT "Word is too long and cannot be inserted");
-        return -EINVAL
+        return -EINVAL;
     }
 
-    struct list_elem *new_elem;
-    new_elem = kmalloc(sizeof(struct list_elem), GFP_KERNEL);
+    new_elem = (struct list_elem*) kmalloc(sizeof(struct list_elem), GFP_KERNEL);
 
     // does return the number of bytes that could not be copied
     if(copy_from_user(new_elem->word, user_buffer, count) != 0) {
@@ -61,7 +62,7 @@ static ssize_t my_write(struct file *file, const char __user *user_buffer, size_
         return -EFAULT;
     }
 
-    list_add_tail(&(new_elem->my_list), &(char_device.word_list_head));
+    list_add_tail(&(new_elem->my_list), &(char_device.word_list_head.my_list));
 
     bytes_written = count;
     char_device.list_len += 1;
@@ -74,14 +75,13 @@ static ssize_t my_read(struct file *file, char __user *user_buffer, size_t count
     // program a for loop which is looping count times
     int words_read;
     int i;
+    struct list_elem *current_elem;
 
     // Make sure our user isn't trying to read more data than there is.
     if(count > char_device.list_len) {
         count = char_device.list_len;
     }
 
-
-    struct list_elem *current_elem;
     for(i = 0; i < count; i++)
     {
         if(i == 0)
@@ -90,7 +90,7 @@ static ssize_t my_read(struct file *file, char __user *user_buffer, size_t count
         }
         else
         {
-            current_elem = list_entry(&(current_elem.my_list), struct list_elem, my_list);
+            current_elem = list_entry(&(current_elem->my_list), struct list_elem, my_list);
         }
 
         if(copy_to_user(user_buffer, (current_elem->word) ", ", sizeof(current_elem->word) + 3) != 0) {
@@ -118,14 +118,15 @@ const struct file_operations fops = {
 
 static int __init my_init(void)
 {
+    int err;
+    dev_t dev; // This is 32 bit quantity with 12 bit for the major and 20 bit for the minor
+
     // Initialize the head of the list
     char_device.word_list_head.word = ". Start:";
     LIST_HEAD(&(char_device.word_list_head.my_list));
     char_device.list_len = 1;
 
     // TO-DO: Error handling
-    int err;
-    dev_t dev; // This is 32 bit quantity with 12 bit for the major and 20 bit for the minor
     printk(KERN_ALERT "Initializing store_message driver...start\n");
 
     err = alloc_chrdev_region(&dev, 0, NUM_OF_DEVICES, DEVICE_NAME); // the major and minor will get stored in dev and will be dynamically produced by this function, and 0 is the starting number for the nummeration of the minors
