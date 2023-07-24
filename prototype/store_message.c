@@ -7,6 +7,7 @@
 #include <linux/fs.h>
 #include <linux/list.h>
 #include <linux/slab.h>
+#include <linux/string.h>
 
 MODULE_LICENSE("Dual BSD/GPL");
 #define CDRV_MAJOR 42
@@ -15,7 +16,6 @@ MODULE_LICENSE("Dual BSD/GPL");
 #define NUM_OF_DEVICES 1
 #define MAX_LIST_LEN 100
 #define DEVICE_NAME "store_message"
-
 
 
 struct list_elem
@@ -93,10 +93,10 @@ static ssize_t my_read(struct file *file, char __user *user_buffer, size_t count
             current_elem = list_entry(&(current_elem->my_list), struct list_elem, my_list);
         }
 
-        if(copy_to_user(user_buffer, (current_elem->word) ", ", sizeof(current_elem->word) + 3) != 0) {
+        if(copy_to_user(user_buffer, (current_elem->word), sizeof(current_elem->word)) != 0) {
             return -EFAULT;
         }
-        user_buffer += sizeof(current_elem->word) + 3;
+        user_buffer += sizeof(current_elem->word);
 
     }
     words_read = count;
@@ -122,7 +122,7 @@ static int __init my_init(void)
     dev_t dev; // This is 32 bit quantity with 12 bit for the major and 20 bit for the minor
 
     // Initialize the head of the list
-    char_device.word_list_head.word = ". Start:";
+    strncpy(char_device.word_list_head.word, ". Start:", WORD_LEN);
     LIST_HEAD(&(char_device.word_list_head.my_list));
     char_device.list_len = 1;
 
