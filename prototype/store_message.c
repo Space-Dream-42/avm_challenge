@@ -11,7 +11,7 @@
 #include <linux/timer.h>
 #include <linux/jiffies.h>
 #include <linux/mutex.h>
-#include <linux/err.h
+#include <linux/err.h>
 
 MODULE_LICENSE("Dual BSD/GPL");
 #define CDRV_MAJOR 42
