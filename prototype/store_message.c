@@ -41,7 +41,7 @@ static struct class *mychardev_class = NULL;
 static int dev_major = 0;
 struct timer_list print_timer;
 struct list_elem *elem_to_print;
-static DEFINE_MUTEX(my_mutex)
+static DEFINE_MUTEX(my_mutex);
 
 static int my_open(struct inode *inode, struct file *file)
 {
@@ -68,9 +68,9 @@ static ssize_t my_write(struct file *file, const char __user *user_buffer, size_
         return -EFAULT;
     }
 
-    mutex_lock(my_mutex);
+    mutex_lock(&my_mutex);
     list_add_tail(&(new_elem->my_list), &(char_device.word_list_head.my_list));
-    mutex_unlock(my_mutex);
+    mutex_unlock(&my_mutex);
 
     bytes_written = count;
     char_device.list_len += 1;
