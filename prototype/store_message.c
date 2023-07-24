@@ -82,7 +82,7 @@ static ssize_t my_read(struct file *file, char __user *user_buffer, size_t count
         count = char_device.list_len;
     }
 
-    for(i = 0; i < count; i++)
+    for(i = 0; i < count + 1; i++)
     {
         if(i == 0)
         {
