@@ -140,12 +140,12 @@ static int mychardev_uevent(struct device *dev, struct kobj_uevent_env *env)
     return 0;
 }
 
-void print_list(struct timer_list *data)
+void print_list_elem(struct timer_list *data)
 {   
     printk(KERN_ALERT "%s\n", elem_to_print->word);
     elem_to_print = list_entry((elem_to_print->my_list).next, struct list_elem, my_list);
     
-    mod_timer(&print_timer, msecs_to_jiffies(TIMEOUT));
+    mod_timer(&print_timer, jiffies + msecs_to_jiffies(TIMEOUT));
 }
 
 const struct file_operations fops = {
@@ -165,8 +165,9 @@ static int __init my_init(void)
     char_device.list_len = 1;
 
     // Initialize the print timer
-    timer_setup(&print_timer, print_list, 0);
-    mod_timer(&print_timer, msecs_to_jiffies(TIMEOUT));
+    timer_setup(&print_timer, print_list_elem, 0);
+    print_timer.expires = jiffies + msecs_to_jiffies(TIMEOUT); 
+    add_timer(&print_timer);
     elem_to_print = &(char_device.word_list_head);
 
     // TO-DO: Error handling
